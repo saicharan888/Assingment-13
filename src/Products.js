@@ -2,16 +2,7 @@ import React, { Component } from 'react'
 import Filters from './Filters'
 import ProductTable from './ProductTable'
 import ProductForm from './ProductForm'
-
-let PRODUCTS = {
-    '1': {id: 1, category: 'Music', price: '$459.99', name: 'Clarinet'},
-    '2': {id: 2, category: 'Music', price: '$5,000', name: 'Cello'},
-    '3': {id: 3, category: 'Music', price: '$3,500', name: 'Tuba'},
-    '4': {id: 4, category: 'Furniture', price: '$799', name: 'Chaise Lounge'},
-    '5': {id: 5, category: 'Furniture', price: '$1,300', name: 'Dining Table'},
-    '6': {id: 6, category: 'Furniture', price: '$100', name: 'Bean Bag'}
-};
-
+let PRODUCTS = {};
 class Products extends Component {
     constructor(props) {
         super(props)
@@ -22,31 +13,94 @@ class Products extends Component {
         this.handleFilter = this.handleFilter.bind(this)
         this.handleDestroy = this.handleDestroy.bind(this)
         this.handleSave = this.handleSave.bind(this)
+        this.handleUpdate = this.handleUpdate.bind(this)
+        this.populateForm = this.populateForm.bind(this)
+        this.child = React.createRef();
     }
-
+    componentDidMount(){
+        //For fetching the products
+        fetch(`/product/get`)
+        .then(data => data.json())
+        .then(data => this.setState({products:data}))
+    }
     handleFilter(filterInput) {
         this.setState(filterInput)
     }
-
     handleSave(product) {
-        if (!product.id) {
-            product.id = new Date().getTime()
-        }
+        product.productid = new Date().getTime()
+        product.instock = true;
+        //For setting the new product to the state
         this.setState((prevState) => {
             let products = prevState.products
-            products[product.id] = product
+            products[product.productid] = product
             return { products }
         })
+        var data = {'product' : product, 'id': product.productid}
+        fetch('/product/create',{
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                        'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        }).then(response => {
+            console.log(response)
+        })
+        .catch(error =>{
+            console.log(error)
+        })
     }
-
     handleDestroy(productId) {
+        //For updating the state after deletion
         this.setState((prevState) => {
             let products = prevState.products
             delete products[productId]
             return { products }
         });
+        //For Deleting the product
+        fetch(`/product/delete/${productId}`,{
+            method: 'DELETE',
+            headers: {
+                Accept: 'application/json',
+                        'Content-Type': 'application/json',
+            }
+        }).then(response => {
+            console.log(response)
+        })
+        .catch(error =>{
+            console.log(error)
+        })
     }
-
+    populateForm(productId) {
+        console.log("Update this "+productId)
+        let productToUpdate = this.state.products[productId]
+        this.child.current.fillForm(productToUpdate);
+    }
+    handleUpdate(updatedProduct) {
+        console.log("Updated")
+        console.log(updatedProduct)
+        this.setState((prevState) => {
+            let products = prevState.products
+            products[updatedProduct.productid] = updatedProduct
+            return { products }
+        });
+        //Persist the product in Mongodb
+        var productId = updatedProduct.productid;
+        var data = {'product' : updatedProduct, 'id': productId}
+        fetch(`/product/update/${productId}`,{
+            method: 'PUT',
+            headers: {
+                Accept: 'application/json',
+                        'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        }).then(response => {
+            console.log(response)
+        })
+        .catch(error =>{
+            console.log(error)
+        })
+    }
     render () {
         return (
             <div>
@@ -56,12 +110,16 @@ class Products extends Component {
                 <ProductTable 
                     products={this.state.products}
                     filterText={this.state.filterText}
-                    onDestroy={this.handleDestroy}></ProductTable>
+                    onDestroy={this.handleDestroy}
+                    onModify={this.populateForm}
+                    onUpdate={this.handleUpdate}>
+                </ProductTable>
                 <ProductForm
-                    onSave={this.handleSave}></ProductForm>
+                    onUpdate={this.handleUpdate}
+                    onSave={this.handleSave}
+                    ref={this.child}></ProductForm>
             </div>
         )
     }
 }
-
 export default Products
